@@ -63,6 +63,73 @@ def interfaces():
     pass
 
 
+#
+# 'tx_err' subcommand ("show interfaces tx-err-monitoring-states")
+#
+
+@interfaces.command()
+def tx_err_monitoring_states():
+    """Show Interfaces tx err monitoring information"""
+
+    localhost = '127.0.0.1'
+    state_db = SonicV2Connector(host=localhost)
+    state_db.connect(state_db.STATE_DB, False)
+    tx_err_state_prefix = "TX_ERR_STATE|"
+    _hash = '{}{}'.format(tx_err_state_prefix, '*')
+    tx_err_port_state_keys = state_db.keys(state_db.STATE_DB, _hash)
+    tx_err_state_key = "state"
+    empty_string = ""
+    table = []
+
+    for key in natsorted(tx_err_port_state_keys):
+        row = []
+        # TX_ERR_STATE|Ethernet0 -> Ethernet0
+        port_name = key.replace(tx_err_state_prefix, empty_string) 
+        row.append(port_name)
+        port_state = state_db.get(state_db.STATE_DB, tx_err_state_prefix + port_name, tx_err_state_key)
+        row.append(port_state)
+        table.append(row)
+
+    click.echo(tabulate(table, headers = ['IFACE', 'STATE'], tablefmt="grid"))
+
+
+#
+# 'tx_err' subcommand ("show interfaces tx-err-monitoring-config")
+#
+
+@interfaces.command()
+def tx_err_monitoring_config():
+    """Show Interfaces tx err monitoring configuration"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    tx_err_cfg_table_name = "TX_ERR_CFG"
+    tx_err_cfg_key = "config"
+    tx_err_monitor_time_period_key = "period"
+    tx_err_monitor_threshold_key = "threshold"
+    empty_string = ""
+    empty_config = True
+    table = []
+    row = []
+
+    cfg = config_db.get_entry(tx_err_cfg_table_name, tx_err_cfg_key)
+    if cfg is not None:
+        if tx_err_monitor_time_period_key in cfg:
+            row.append(cfg[tx_err_monitor_time_period_key])
+            empty_config = False
+        else:
+            row.append(empty_string)
+        if tx_err_monitor_threshold_key in cfg:
+            row.append(cfg[tx_err_monitor_threshold_key])
+            empty_config = False
+        else:
+            row.append(empty_string)
+    if not empty_config:
+        table.append(row)
+
+    click.echo(tabulate(table, headers = ['PERIOD', 'THRESHOLD'], tablefmt="grid"))
+
+
 # 'alias' subcommand ("show interfaces alias")
 @interfaces.command()
 @click.argument('interfacename', required=False)
