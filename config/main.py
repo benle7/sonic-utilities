@@ -6044,6 +6044,32 @@ def unbind(ctx, interface_name):
         config_db.set_entry(table_name, interface_name, None)
 
     click.echo("Interface {} IP disabled and address(es) removed due to unbinding VRF.".format(interface_name))
+
+#
+# 'tx_err_monitoring_threshold' subcommand ('config tx_err_monitoring_threshold')
+#
+
+@config.command()
+@click.argument('threshold', metavar='<threshold>', required=True, type=click.IntRange(0, 4294967295))
+def tx_err_monitoring_threshold(threshold):
+    """Set threshold of tx error monitoring"""
+
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    config_db.mod_entry("TX_ERR_CFG", "config", {"threshold": threshold})
+
+#
+# 'tx_err_monitoring_period' subcommand ('config tx_err_monitoring_period')
+#
+
+@config.command()
+@click.argument('period', metavar='<period>', required=True, type=click.IntRange(1, 4294967295))
+def tx_err_monitoring_period(period):
+    """Set period of tx error monitoring"""
+    config_db = ConfigDBConnector()
+    config_db.connect()
+    config_db.mod_entry("TX_ERR_CFG", "config", {"period": period})
+
 #
 # 'ipv6' subgroup ('config interface ipv6 ...')
 #
