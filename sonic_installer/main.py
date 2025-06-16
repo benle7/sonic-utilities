@@ -274,6 +274,8 @@ def update_sonic_environment(bootloader, binary_image_version):
 
     sonic_version = re.sub(IMAGE_PREFIX, '', binary_image_version, 1)
     new_image_dir = bootloader.get_image_path(binary_image_version)
+    new_image_upper_dir = os.path.join(new_image_dir, UPPERDIR_NAME)
+    new_image_work_dir = os.path.join(new_image_dir, WORKDIR_NAME)
     new_image_mount = os.path.join('/', "tmp", "image-{0}-fs".format(sonic_version))
     env_dir = os.path.join(new_image_dir, "sonic-config")
     env_file = os.path.join(env_dir, "sonic-environment")
@@ -281,6 +283,16 @@ def update_sonic_environment(bootloader, binary_image_version):
     with bootloader.get_rootfs_path(new_image_dir) as new_image_squashfs_path:
         try:
             mount_squash_fs(new_image_squashfs_path, new_image_mount)
+
+            # make sure upper dir and work dir exist to mount the filesystem as rw
+            run_command_or_raise(["mkdir", "-p", new_image_upper_dir])
+            run_command_or_raise(["mkdir", "-p", new_image_work_dir])
+            mount_overlay_fs(new_image_mount, new_image_upper_dir, new_image_work_dir, new_image_mount)
+            install_hook_script_path = new_image_mount+'/usr/local/bin/upgrade_hook_script.py'
+            if os.path.exists(install_hook_script_path):
+                run_command_or_raise([install_hook_script_path, "--image-dir", new_image_mount])
+            else:
+                log.log(LOG_NOTICE, "No install hook script", False)
 
             next_sonic_env_template_file = os.path.join(new_image_mount, SONIC_ENV_TEMPLATE_FILE)
             next_sonic_version_yml_file = os.path.join(new_image_mount, SONIC_VERSION_YML_FILE)
@@ -303,6 +315,7 @@ def update_sonic_environment(bootloader, binary_image_version):
                 os.remove(env_file)
                 os.rmdir(env_dir)
         finally:
+            umount(new_image_mount, recursive=True, read_only=False, remove_dir=False, raise_exception=False)
             umount(new_image_mount)
 
 
