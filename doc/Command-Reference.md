@@ -1186,9 +1186,28 @@ This command displays the status of the device's thermal sensors
      xSFP module 32 Temp           39.5       70.0       N/A            90.0            N/A      False  20200302 06:59:58
   ```
 
+**show platform bmc os**
+
+This command displays the BMC operating system (`openbmc` or `sonic`), as defined in
+`bmc_os.json` in the HwSKU directory.
+
+- Usage:
+  ```
+  show platform bmc os
+  ```
+
+- Example:
+  ```
+  admin@sonic:~$ show platform bmc os
+  sonic
+  ```
+
 **show platform bmc summary**
 
-This command displays BMC summary information including manufacturer, model, part number, serial number, power state, and firmware version
+This command displays BMC summary information including manufacturer, model, part number,
+serial number, power state, and firmware version. Supported for both BMC OS types; when
+BMC OS is `sonic`, `FirmwareVersion` is shown as `N/A` since it cannot be retrieved without
+Redfish.
 
 - Usage:
   ```
@@ -1198,7 +1217,7 @@ This command displays BMC summary information including manufacturer, model, par
 - Options:
   - `--json`: Output information in JSON format
 
-- Example:
+- Example (OpenBMC):
   ```
   admin@sonic:~$ show platform bmc summary
   Manufacturer: ASPEED
@@ -1207,6 +1226,17 @@ This command displays BMC summary information including manufacturer, model, par
   SerialNumber: 123456789
   PowerState: On
   FirmwareVersion: 1.0.0
+  ```
+
+- Example (SONiC BMC):
+  ```
+  admin@sonic:~$ show platform bmc summary
+  Manufacturer: NVIDIA
+  Model: P4102-A01
+  PartNumber: 699-24102-0100-EB1
+  SerialNumber: MT260560000K
+  PowerState: On
+  FirmwareVersion: N/A
   ```
 
 - Example (JSON format):
@@ -1224,7 +1254,10 @@ This command displays BMC summary information including manufacturer, model, par
 
 **show platform bmc eeprom**
 
-This command displays BMC EEPROM information
+This command displays BMC EEPROM information. When BMC OS is `openbmc`, fields come from
+Redfish. When BMC OS is `sonic`, Manufacturer, Model, PartNumber, and SerialNumber are read
+from the BMC remote STATE_DB; PowerState reflects the reachability of the BMC (`On` if it
+responds to ping, `Off` otherwise).
 
 - Usage:
   ```
@@ -1234,7 +1267,7 @@ This command displays BMC EEPROM information
 - Options:
   - `--json`: Output information in JSON format
 
-- Example:
+- Example (OpenBMC):
   ```
   admin@sonic:~$ show platform bmc eeprom
   Manufacturer: ASPEED
@@ -1242,6 +1275,16 @@ This command displays BMC EEPROM information
   PartNumber: 123-12345-1234-AB1
   PowerState: On
   SerialNumber: 123456789
+  ```
+
+- Example (SONiC BMC):
+  ```
+  admin@sonic:~$ show platform bmc eeprom
+  Manufacturer: NVIDIA
+  Model: P4102-A01
+  PartNumber: 699-24102-0100-EB1
+  PowerState: On
+  SerialNumber: MT260560000K
   ```
 
 - Example (JSON format):
@@ -3013,11 +3056,27 @@ Go Back To [Beginning of the document](#) or [Beginning of this section](#arp--n
 
 ## BMC
 
+On Switch-Host platforms, the BMC peer on the USB/BMC link may run OpenBMC (Redfish) or
+SONiC-on-BMC (Redis). The type is defined per HwSKU by the `os` field (`openbmc` or
+`sonic`) in `bmc_os.json` in the HwSKU directory
+(`/usr/share/sonic/device/<platform>/<hwsku>/bmc_os.json`). When the file is missing or
+invalid, the default is `sonic`. To change the BMC OS, edit this file. Use
+`show platform bmc os` to display the current value.
+
+All BMC commands are supported only when run on the Switch-Host (not on the BMC
+itself). OpenBMC-only commands (Redfish session management: `reset-root-password`,
+`open-session`, `close-session`) additionally require `os` to be `openbmc`.
+`show platform bmc eeprom` and `show platform bmc summary` work for both: OpenBMC returns full Redfish
+EEPROM fields and firmware version; SONiC BMC returns Manufacturer, Model, PartNumber, and
+SerialNumber from remote STATE_DB, with PowerState derived from BMC reachability (ping) and
+FirmwareVersion shown as `N/A`.
+
 ### BMC config commands
 
 **config bmc open-session**
 
-This command opens a session with the BMC and returns session credentials
+This command opens a session with the BMC and returns session credentials. Supported only
+when BMC OS is `openbmc`.
 
 - Usage:
   ```
@@ -3033,7 +3092,8 @@ This command opens a session with the BMC and returns session credentials
 
 **config bmc close-session**
 
-This command closes a BMC session using the provided session ID
+This command closes a BMC session using the provided session ID. Supported only when BMC
+OS is `openbmc`.
 
 - Usage:
   ```
@@ -3051,7 +3111,8 @@ This command closes a BMC session using the provided session ID
 
 **config bmc reset-root-password**
 
-This command resets the BMC root password to default
+This command resets the BMC root password to default. Supported only when BMC OS is
+`openbmc`.
 
 - Usage:
   ```
@@ -7001,6 +7062,7 @@ Subsequent pages explain each of these commands in detail.
   switchport   Show Interface switchport information
   tpid         Show Interface tpid information
   transceiver  Show SFP Transceiver information
+  label-port   Show label-port mapping information
   ```
 
 **show interfaces autoneg**
@@ -7881,6 +7943,93 @@ is command.
 **show interfaces transceiver**
 
 This command is already explained [here](#Transceivers)
+
+**show interfaces label-port status**
+
+This command displays a standardized mapping of front-panel label ports to SONiC interface names, their lanes, and operational status under the current breakout configuration. Each table cell shows the mapped interface name and status for the corresponding lane (for example, `Ethernet0(UP)`). On multi-ASIC systems, the interface name also includes the ASIC namespace (for example, `Ethernet0|asic0(UP)`).
+
+The purpose of this command is to correlate the fibers of a passive connector (such as MPO or MMC) with the SONiC ports wired through that connector, and to report the status of each one. In this context a label port identifies the panel position where such a connector is plugged in, and its lanes are the fibers inside it. Each lane column corresponds to a fiber of the connector, so the table tells which interface a given fiber carries, and the operational status of the port.
+
+- Usage:
+  ```
+  show interfaces label-port status
+  ```
+
+- Example (single-ASIC, 2 x 4x breakout):
+  ```
+  admin@sonic:~$ show interfaces label-port status
+  +--------------+-----------------+-----------------+-----------------+-----------------+
+  |   Label Port | Lane 1          | Lane 2          | Lane 3          | Lane 4          |
+  +==============+=================+=================+=================+=================+
+  |            1 | Ethernet0(UP)   | Ethernet0(UP)   | Ethernet0(UP)   | Ethernet0(UP)   |
+  |            2 | Ethernet4(UP)   | Ethernet4(UP)   | Ethernet4(UP)   | Ethernet4(UP)   |
+  |            3 | Ethernet8(UP)   | Ethernet8(UP)   | Ethernet8(UP)   | Ethernet8(UP)   |
+  |          ... | ...             | ...             | ...             | ...             |
+  |          128 | Ethernet508(UP) | Ethernet508(UP) | Ethernet508(DOWN) | Ethernet508(UP) |
+  +--------------+-----------------+-----------------+-----------------+-----------------+
+  ```
+
+- Example (single-ASIC, 4 x 2x breakout):
+  ```
+  admin@sonic:~$ show interfaces label-port status
+  +--------------+-----------------+-----------------+------------------+------------------+
+  |   Label Port | Lane 1          | Lane 2          | Lane 3           | Lane 4           |
+  +==============+=================+=================+==================+==================+
+  |            1 | Ethernet0(UP)   | Ethernet0(UP)   | Ethernet2(UP)    | Ethernet2(UP)    |
+  |            2 | Ethernet4(UP)   | Ethernet4(UP)   | Ethernet6(UP)    | Ethernet6(UP)    |
+  |            3 | Ethernet8(UP)   | Ethernet8(UP)   | Ethernet10(UP)   | Ethernet10(UP)   |
+  |          ... | ...             | ...             | ...              | ...              |
+  |          128 | Ethernet508(UP) | Ethernet508(UP) | Ethernet510(DOWN) | Ethernet510(UP)   |
+  +--------------+-----------------+-----------------+------------------+------------------+
+  ```
+
+- Example (multi-ASIC):
+  ```
+  admin@sonic:~$ show interfaces label-port status
+  +--------------+---------------------+-----------------------+------------------------+------------------------+
+  |   Label Port | Lane 1              | Lane 2                | Lane 3                 | Lane 4                 |
+  +==============+=====================+=======================+========================+========================+
+  |            1 | Ethernet0|asic0(UP) | Ethernet512|asic1(UP) | Ethernet1024|asic2(UP) | Ethernet1536|asic3(UP) |
+  |            2 | Ethernet1|asic0(UP) | Ethernet513|asic1(UP) | Ethernet1025|asic2(UP) | Ethernet1537|asic3(UP) |
+  |            3 | Ethernet2|asic0(UP) | Ethernet514|asic1(UP) | Ethernet1026|asic2(UP) | Ethernet1538|asic3(UP) |
+  |          ... | ...                 | ...                   | ...                    | ...                    |
+  |          512 | Ethernet511|asic0(UP) | Ethernet1023|asic1(UP) | Ethernet1535|asic2(DOWN) | Ethernet2047|asic3(UP) |
+  +--------------+---------------------+-----------------------+------------------------+------------------------+
+  ```
+
+- Platform requirements (`platform.json`):
+
+  All supported platforms must define `label_port_lanes_mapping`:
+
+  - **Key**: label-port identifier (string), for example `"1"`, `"2"`.
+  - **Value**: list of global lane numbers (strings), for example `["0", "1", "2", "3"]`.
+
+  Multi-ASIC platforms must also define `number_of_lanes_per_asic`. This value is used to compute global lane offsets:
+
+  `global_lane = local_lane + (asic_index x number_of_lanes_per_asic)`
+
+  Single-ASIC example:
+  ```json
+  "label_port_lanes_mapping": {
+     "1": ["0", "1", "2", "3"],
+     "2": ["4", "5", "6", "7"],
+     ...
+     "127": ["504", "505", "506", "507"],
+     "128": ["508", "509", "510", "511"]
+  }
+  ```
+
+  Multi-ASIC example:
+  ```json
+  "number_of_lanes_per_asic": "512",
+  "label_port_lanes_mapping": {
+     "1": ["0", "512", "1024", "1536"],
+     "2": ["1", "513", "1025", "1537"],
+     ...
+     "511": ["510", "1022", "1534", "2046"],
+     "512": ["511", "1023", "1535", "2047"]
+  }
+  ```
 
 Go Back To [Beginning of the document](#) or [Beginning of this section](#interfaces)
 
@@ -11317,7 +11466,7 @@ Default values are the following:
    - action - 'drop'
    - pfc stat history - disable
 
-Additionally if number of ports in the system exceeds 32, all times will be multiplied by roughly <num_ports\>/32.
+Additionally if the number of ports the watchdog is enabled on exceeds 32, all times will be multiplied by roughly <num_ports\>/32. Only ports that PFC watchdog is actually configured on are counted, i.e. ports that have `pfc_enable` set in `PORT_QOS_MAP`; ports that are skipped because PFC is not enabled on them do not affect these times.
 
 
 **show pfcwd config**
@@ -13197,6 +13346,22 @@ This command takes global sflow sample direction. If not configured, default is 
 - Example:
   ```
   admin@sonic:~# sudo config sflow sample-direction tx
+  ```
+**config sflow drop-monitor-limit**
+
+This command is used to enable or disable the drop notification and configure the maximum rate at which such notifications are sent. By default, drop monitoring is disabled.
+
+- Usage:
+  ```
+  config sflow drop-monitor-limit <limit>
+  ```
+
+  - Parameters:
+    - limit: specify the maximum number of drop notifications to be sent per second. The valid range is 0 to 500. 0 means disable drop monitoring.
+
+- Example:
+  ```
+  admin@sonic:~# sudo config sflow drop-monitor-limit 100
   ```
 **config sflow interface**
 
